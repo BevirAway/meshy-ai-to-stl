@@ -5,7 +5,7 @@ set -eu
 
 BASE_URL="${MESHY_DECODER_BASE_URL:-https://www.meshy.ai/pt-BR/resource/decrypt}"
 
-root=$(cd "$(dirname "$0")" && pwd)
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 vendor="$root/chrome-extension/vendor"
 
 if ! command -v curl >/dev/null 2>&1; then
