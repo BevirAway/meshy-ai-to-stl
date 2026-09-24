@@ -38,5 +38,6 @@ powershell -ExecutionPolicy Bypass -File .\setup-vendor.ps1
 - `vendor/mesh_loader.js` and `vendor/mesh_loader.wasm` are not versioned in this repository; run `setup-vendor.sh` (macOS/Linux) or `setup-vendor.ps1` (Windows) to download your local copies.
 - If the extension says decoder files are missing, run the setup script and reload the extension in `chrome://extensions`.
 - STL output is binary, OBJ output contains geometry without materials, OBJ + textures downloads a ZIP with `model.obj`, `model.mtl`, and PNG texture images, Textures PNG downloads only the extracted PNG images, and GLB preserves the decoded model data.
+- Textures the browser cannot decode (for example KTX2) are included in their original format instead of PNG.
 - The extension also checks `performance.getEntriesByType("resource")`, so many files visible in the Network panel will automatically appear in the popup.
 - Sites with login, temporary URLs, or strict download permissions may require you to be logged in with the same Chrome session.

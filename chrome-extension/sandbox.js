@@ -327,20 +327,40 @@ async function bytesToPng(bytes, mimeType) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+const imageExtensions = { "image/jpeg": "jpg", "image/webp": "webp", "image/ktx2": "ktx2", "image/vnd-ms.dds": "dds" };
+
 async function buildImageFiles(gltf, bin) {
   const imageFiles = new Map();
+  const usedNames = new Set();
 
   for (let imageIndex = 0; imageIndex < (gltf.images || []).length; imageIndex++) {
     const image = gltf.images[imageIndex];
     const imageData = imageBytes(gltf, bin, imageIndex);
     if (!imageData) continue;
 
-    const filename = `textures/${sanitizeName(image.name, `texture_${imageIndex + 1}`)}.png`;
-    const bytes = await bytesToPng(imageData.bytes, imageData.mimeType);
-    imageFiles.set(imageIndex, { filename, bytes });
+    let bytes;
+    let extension = "png";
+    try {
+      bytes = await bytesToPng(imageData.bytes, imageData.mimeType);
+    } catch {
+      // The browser cannot decode this image (e.g. KTX2), so keep the original file.
+      bytes = imageData.bytes;
+      extension = imageExtensions[imageData.mimeType] || "bin";
+    }
+
+    let base = sanitizeName(image.name, `texture_${imageIndex + 1}`);
+    if (usedNames.has(base)) base = `${base}_${imageIndex + 1}`;
+    usedNames.add(base);
+    imageFiles.set(imageIndex, { filename: `textures/${base}.${extension}`, bytes });
   }
 
   return imageFiles;
+}
+
+function textureSource(texture) {
+  return texture.extensions?.EXT_texture_webp?.source
+    ?? texture.source
+    ?? texture.extensions?.KHR_texture_basisu?.source;
 }
 
 async function buildTextureFiles(gltf, bin) {
@@ -349,7 +369,7 @@ async function buildTextureFiles(gltf, bin) {
 
   for (let textureIndex = 0; textureIndex < (gltf.textures || []).length; textureIndex++) {
     const texture = gltf.textures[textureIndex];
-    const imageFile = imageFiles.get(texture.source);
+    const imageFile = imageFiles.get(textureSource(texture));
     if (imageFile) textureFiles.set(textureIndex, imageFile);
   }
 
@@ -377,7 +397,6 @@ function appendMtlMaterial(lines, name, material, textureFiles, fallbackTextureF
     || materialTextureFile(textureFiles, specGloss.diffuseTexture)
     || (material ? null : fallbackTextureFile);
   const normalTexture = materialTextureFile(textureFiles, material?.normalTexture);
-  const occlusionTexture = materialTextureFile(textureFiles, material?.occlusionTexture);
   const emissiveTexture = materialTextureFile(textureFiles, material?.emissiveTexture);
   const metallicRoughnessTexture = materialTextureFile(textureFiles, pbr.metallicRoughnessTexture);
   const emissive = material?.emissiveFactor || [0, 0, 0];
@@ -398,7 +417,6 @@ function appendMtlMaterial(lines, name, material, textureFiles, fallbackTextureF
   }
   if (emissiveTexture) lines.push(`map_Ke ${emissiveTexture.filename}`);
   if (normalTexture) lines.push(`norm ${normalTexture.filename}`);
-  if (occlusionTexture) lines.push(`map_Ka ${occlusionTexture.filename}`);
   if (metallicRoughnessTexture) {
     lines.push(`map_Pr ${metallicRoughnessTexture.filename}`);
     lines.push(`map_Pm ${metallicRoughnessTexture.filename}`);
@@ -448,32 +466,6 @@ function transformTextureCoord(uv, textureInfo) {
   ];
 }
 
-function materialDebugInfo(gltf, textureFiles) {
-  return {
-    materials: (gltf.materials || []).map((material, index) => {
-      const pbr = material.pbrMetallicRoughness || {};
-      const specGloss = material.extensions?.KHR_materials_pbrSpecularGlossiness || {};
-      const baseColorTexture = pbr.baseColorTexture || specGloss.diffuseTexture || null;
-      const textureFile = materialTextureFile(textureFiles, baseColorTexture);
-      return {
-        index,
-        objName: `material_${index + 1}`,
-        sourceName: material.name || null,
-        baseColorFactor: pbr.baseColorFactor || specGloss.diffuseFactor || null,
-        textureIndex: baseColorTexture?.index ?? null,
-        texCoord: baseColorTexture?.extensions?.KHR_texture_transform?.texCoord ?? baseColorTexture?.texCoord ?? 0,
-        textureTransform: baseColorTexture?.extensions?.KHR_texture_transform || null,
-        mapKd: textureFile?.filename || null,
-      };
-    }),
-    textures: (gltf.textures || []).map((texture, index) => ({
-      index,
-      source: texture.source ?? null,
-      file: textureFiles.get(index)?.filename || null,
-    })),
-  };
-}
-
 async function glbToTexturedObjFiles(buffer) {
   const { json, bin } = readGlb(buffer);
   const meshNodes = collectMeshNodes(json);
@@ -516,7 +508,8 @@ async function glbToTexturedObjFiles(buffer) {
       if (texcoords) {
         for (let i = 0; i < texcoords.count; i++) {
           const uv = transformTextureCoord(texcoords.get(i), textureInfo);
-          objLines.push(`vt ${uv[0]} ${uv[1]}`);
+          // glTF puts the UV origin at the top-left of the image, OBJ at the bottom-left.
+          objLines.push(`vt ${uv[0]} ${1 - uv[1]}`);
         }
       }
 
@@ -543,7 +536,6 @@ async function glbToTexturedObjFiles(buffer) {
   const files = [
     { name: "model.obj", data: textEncoder.encode(`${objLines.join("\n")}\n`) },
     { name: "model.mtl", data: textEncoder.encode(buildMtl(json, textureFiles, fallbackTextureFile)) },
-    { name: "debug-materials.json", data: textEncoder.encode(JSON.stringify(materialDebugInfo(json, textureFiles), null, 2)) },
   ];
 
   const addedTextures = new Set();
