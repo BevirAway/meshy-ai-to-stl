@@ -12,19 +12,36 @@ Meshy To STL is a Chrome extension that finds `.meshy` files loaded by the curre
 
 ## Installation
 
-Before loading the extension, download the local decoder files:
+Works in Google Chrome (and other Chromium browsers such as Edge, Brave, or Arc) on macOS, Windows, and Linux.
+
+Before loading the extension, download the local decoder files.
+
+### macOS
+
+Open Terminal and run:
+
+```sh
+cd ~/Desktop/meshy-ai-to-stl
+./setup-vendor.sh
+```
+
+If you get `permission denied`, run `sh ./setup-vendor.sh` instead.
+
+### Windows
 
 ```powershell
-cd C:\Users\YOUR-USER\Desktop\meshy
+cd C:\Users\YOUR-USER\Desktop\meshy-ai-to-stl
 powershell -ExecutionPolicy Bypass -File .\setup-vendor.ps1
 ```
 
-Then load the extension in Chrome:
+### Load the extension
 
 1. Open `chrome://extensions`.
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
-4. Select `C:\Users\SEU_USUARIO\Desktop\meshy\chrome-extension`.
+4. Select the `chrome-extension` folder inside the repository (for example `~/Desktop/meshy-ai-to-stl/chrome-extension` on macOS or `C:\Users\YOUR-USER\Desktop\meshy-ai-to-stl\chrome-extension` on Windows).
+
+On macOS, press `Cmd+Shift+.` in the folder picker if you need to see hidden folders.
 
 ## Usage
 
@@ -38,7 +55,8 @@ Then load the extension in Chrome:
 ## Notes
 
 - Conversion runs locally in your browser.
+- Downloaded files are saved to Chrome's download folder (`~/Downloads` by default on macOS).
 - `chrome-extension/vendor/mesh_loader.js` and `chrome-extension/vendor/mesh_loader.wasm` are intentionally not versioned.
-- Run `setup-vendor.ps1` after cloning the repository.
-- If the extension says decoder files are missing, run `setup-vendor.ps1` and reload the extension in `chrome://extensions`.
+- Run `setup-vendor.sh` (macOS/Linux) or `setup-vendor.ps1` (Windows) after cloning the repository.
+- If the extension says decoder files are missing, run the setup script again and reload the extension in `chrome://extensions`.
 - Sites with login, temporary URLs, or strict download permissions may require you to be logged in with the same Chrome session.
